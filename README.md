@@ -1,3 +1,5 @@
+### Updates: I felt that code can be improved upon - such as using concurrent hashmaps for larger files, wrote a FlowLogGenerator class to duplicate flowlog.txt file to create a flowlog_10mb.txt file. 
+
 # Flow Log Parser
 
 This code parses AWS VPC flow log data and maps each row to a tag based on a lookup table. It generates counts for each tag and port/protocol combination.
@@ -43,3 +45,5 @@ If there a trouble executing the program:
 1. Make sure all of the input files are in the correct format and encoding.
 2. Verify whether JRE is properly installed.
 3. Ensure the paths of the input files are correct.
+
+

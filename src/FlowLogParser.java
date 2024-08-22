@@ -1,10 +1,9 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.io.File;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class FlowLogParser {
 
@@ -96,25 +95,40 @@ public class FlowLogParser {
     }
 
 
-    public static void processFlowLogFile(String flowLogFile) throws IOException{
-        try(BufferedReader br = new BufferedReader(new FileReader(flowLogFile))) {
+    public static void processFlowLogFile(String flowLogFile) throws IOException {
+        List<String> lines = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(flowLogFile))) {
             String line;
-            while ((line=br.readLine())!= null){
-                String[] parts = line.split("\\s+");
-                if(parts.length < 8) continue;
-
-                String dstport = parts[6].trim();
-                String protocol = mapProtocolNumberToName(parts[7].trim());
-
-                String key = dstport + "," + protocol;
-                String tag = lookupTable.getOrDefault(key, "Untagged");
-
-                tagCounts.put(tag, tagCounts.getOrDefault(tag, 0) + 1);
-
-                portProtocolCounts.put(key, portProtocolCounts.getOrDefault(key, 0)+ 1);
-
+            while ((line = br.readLine()) != null) {
+                lines.add(line);
             }
+        }
 
+        // Using ConcurrentHashMap for thread-safe updates of values
+        Map<String, Integer> tagCountsLocal = new ConcurrentHashMap<>();
+        Map<String, Integer> portProtocolCountsLocal = new ConcurrentHashMap<>();
+
+        lines.parallelStream().forEach(line -> {
+            String[] parts = line.split("\\s+");
+            if (parts.length < 8) return;
+
+            String dstport = parts[6].trim();
+            String protocol = mapProtocolNumberToName(parts[7].trim());
+
+            String key = dstport + "," + protocol;
+            String tag = lookupTable.getOrDefault(key, "Untagged");
+
+            tagCountsLocal.merge(tag, 1, Integer::sum);
+            portProtocolCountsLocal.merge(key, 1, Integer::sum);
+        });
+
+        // Updating the global maps after parallel processing
+        synchronized (tagCounts) {
+            tagCountsLocal.forEach((key, value) -> tagCounts.merge(key, value, Integer::sum));
+        }
+
+        synchronized (portProtocolCounts) {
+            portProtocolCountsLocal.forEach((key, value) -> portProtocolCounts.merge(key, value, Integer::sum));
         }
     }
 
